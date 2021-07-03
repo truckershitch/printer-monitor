@@ -30,7 +30,7 @@ SOFTWARE.
 
 #include "Settings.h"
 
-#define VERSION "3.0"
+#define VERSION "3.1"
 
 #define HOSTNAME "PrintMon-" 
 #define CONFIG "/conf.txt"
@@ -59,15 +59,18 @@ void drawOtaProgress(unsigned int, unsigned int);
 void drawScreen1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
 void drawScreen2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
 void drawScreen3(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
+void drawScreen4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
+void drawScreen5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
 void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state);
 void drawClock(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
 void drawWeather(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
+void drawUpdate(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y);
 void drawClockHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state);
 
 // Set the number of Frames supported
-const int numberOfFrames = 3;
+const int numberOfFrames = 5;
 FrameCallback frames[numberOfFrames];
-FrameCallback clockFrame[2];
+FrameCallback clockFrame[3];
 boolean isClockOn = false;
 
 OverlayCallback overlays[] = { drawHeaderOverlay };
@@ -87,6 +90,8 @@ boolean displayOn = true;
 // Printer Client
 #if defined(USE_REPETIER_CLIENT)
   RepetierClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
+#elif defined(USE_MOONRAKER_CLIENT)
+  MoonrakerClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU, UtcOffset);
 #else
   OctoPrintClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
 #endif
@@ -259,8 +264,11 @@ void setup() {
   frames[0] = drawScreen1;
   frames[1] = drawScreen2;
   frames[2] = drawScreen3;
+  frames[3] = drawScreen4;
+  frames[4] = drawScreen5;
   clockFrame[0] = drawClock;
   clockFrame[1] = drawWeather;
+  clockFrame[2] = drawUpdate;
   ui.setOverlays(overlays, numberOfOverlays);
   
   // Inital UI takes care of initalising the display too.
@@ -571,7 +579,7 @@ void handleConfigure() {
   CHANGE_FORM =       "<form class='w3-container' action='/updateconfig' method='get'><h2>Station Config:</h2>"
                       "<p><label>" + printerClient.getPrinterType() + " API Key (get from your server)</label>"
                       "<input class='w3-input w3-border w3-margin-bottom' type='text' name='PrinterApiKey' id='PrinterApiKey' value='%OCTOKEY%' maxlength='60'></p>";
-  if (printerClient.getPrinterType() == "OctoPrint") {
+  if (printerClient.getPrinterType() == "OctoPrint" || printerClient.getPrinterType() == "Moonraker") {
     CHANGE_FORM +=      "<p><label>" + printerClient.getPrinterType() + " Host Name (usually octopi)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='PrinterHostName' value='%OCTOHOST%' maxlength='60'></p>";                        
   }
   CHANGE_FORM +=      "<p><label>" + printerClient.getPrinterType() + " Address (do not include http://)</label>"
@@ -582,7 +590,7 @@ void handleConfigure() {
     CHANGE_FORM +=    "<input type='button' value='Test Connection' onclick='testRepetier()'>"
                       "<input type='hidden' id='selectedPrinter' value='" + printerClient.getPrinterName() + "'><p id='RepetierTest'></p>"
                       "<script>testRepetier();</script>";                        
-  } else {
+  } else if (printerClient.getPrinterType() == "OctoPrint") {
     CHANGE_FORM +=    "<input type='button' value='Test Connection and API JSON Response' onclick='testOctoPrint()'><p id='OctoPrintTest'></p>";
   }
   CHANGE_FORM +=      "<p><label>" + printerClient.getPrinterType() + " User (only needed if you have haproxy or basic auth turned on)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='octoUser' value='%OCTOUSER%' maxlength='30'></p>"
@@ -751,7 +759,7 @@ String getFooter() {
   if (lastReportStatus != "") {
     html += "<i class='fa fa-external-link'></i> Report Status: " + lastReportStatus + "<br>";
   }
-  html += "<i class='fa fa-paper-plane-o'></i> Version: " + String(VERSION) + "<br>";
+  html += "<i class='fa fa-paper-plane-o'></i> Version: " + String(VERSION) + " Next Update: " + getTimeTillUpdate() + "<br>";
   html += "<i class='fa fa-rss'></i> Signal Strength: ";
   html += String(rssi) + "%";
   html += "</footer>";
@@ -805,6 +813,12 @@ void displayPrinterStatus() {
     if (filamentLength > 0) {
       float fLength = float(filamentLength) / 1000;
       html += "Filament: " + String(fLength) + "m<br>";
+    }
+    if (printerClient.isPrinting()) {
+    html += "Layer: " + printerClient.getCurrentLayer() + " / " + printerClient.getTotalLayers() + "<br>";
+    }
+    if (printerClient.isPrinting()) {
+    html += "Estimated Finish Time: " + printerClient.getEstimatedEndTime() + "<br>";
     }
   
     html += "Tool Temperature: " + printerClient.getTempToolActual() + "&#176; C<br>";
@@ -963,6 +977,69 @@ void drawScreen3(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int
   display->drawString(64 + x, 14 + y, time);
 }
 
+void drawScreen4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  
+  String layer = printerClient.getCurrentLayer();
+  String totalLayers = printerClient.getTotalLayers();
+  if (printerClient.getTotalLayers().toInt() >= 1000) {
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->setFont(ArialMT_Plain_16);
+  
+    display->drawString(64 + x, 0 + y, "Layer");
+    //display->setTextAlignment(TEXT_ALIGN_LEFT);
+    display->setFont(ArialMT_Plain_16);
+  
+    display->drawString(64 + x, 16 + y, layer + " / " + totalLayers);
+  } else {
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->setFont(ArialMT_Plain_16);
+
+  display->drawString(64 + x, 0 + y, "Layer");
+  //display->setTextAlignment(TEXT_ALIGN_LEFT);
+  display->setFont(ArialMT_Plain_24);
+
+  display->drawString(64 + x, 14 + y, layer + " / " + totalLayers);
+  }
+}
+
+void drawScreen5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  
+  String EstimatedEnd = printerClient.getEstimatedEndTime();
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->setFont(ArialMT_Plain_16);
+
+  display->drawString(64 + x, 0 + y, "End Time");
+
+  if (IS_24HOUR) {
+    int etaHour;
+    char etaHourBuff[2];
+    int EstEndLen = EstimatedEnd.length();
+    int etaHour12Pos = EstEndLen - 8;
+
+    etaHour = EstimatedEnd.substring(etaHour12Pos, etaHour12Pos + 1).toInt();
+    if (EstimatedEnd.substring(EstEndLen - 2, 2) == "PM") {
+      if (etaHour >= 1 && etaHour <= 11) {
+        etaHour += 12;
+      }
+    }
+    else if (etaHour == 12) {
+      etaHour = 0;
+    }
+    sprintf(etaHourBuff, "%02d", etaHour);
+
+    EstimatedEnd = EstimatedEnd.substring(0, etaHour12Pos) + etaHourBuff + EstimatedEnd.substring(etaHour12Pos + 2, EstEndLen - 4);
+  }
+  //display->setTextAlignment(TEXT_ALIGN_LEFT);
+  if (EstimatedEnd.length() <= 11) { // no date included 
+    display->setFont(ArialMT_Plain_24);
+    display->drawString(64 + x, 14 + y, EstimatedEnd);
+  }
+  else {
+    display->setFont(ArialMT_Plain_16);
+    display->drawString(12 + x, 14 + y, EstimatedEnd);
+  }
+}
+
 void drawClock(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   
@@ -991,6 +1068,39 @@ void drawWeather(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int
   display->drawString(0 + x, 24 + y, weatherClient.getCondition(0));
   display->setFont((const uint8_t*)Meteocons_Plain_42);
   display->drawString(86 + x, 0 + y, weatherClient.getWeatherIcon(0));
+}
+
+void drawUpdate(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->setFont(ArialMT_Plain_16);
+
+  display->drawString(64 + x, 0 + y, "Next Update:");
+  //display->setTextAlignment(TEXT_ALIGN_LEFT);
+  display->setFont(ArialMT_Plain_24);
+
+  display->drawString(64 + x, 14 + y, getTimeTillUpdate());
+}
+
+String getTimeTillUpdate() {
+  String rtnValue = "";
+
+  long timeToUpdate = (((minutesBetweenDataRefresh * 60) + lastEpoch) - timeClient.getCurrentEpoch());
+
+  int hours = numberOfHours(timeToUpdate);
+  int minutes = numberOfMinutes(timeToUpdate);
+  int seconds = numberOfSeconds(timeToUpdate);
+
+  rtnValue += String(hours) + ":";
+  if (minutes < 10) {
+    rtnValue += "0";
+  }
+  rtnValue += String(minutes) + ":";
+  if (seconds < 10) {
+    rtnValue += "0";
+  }
+  rtnValue += String(seconds);
+
+  return rtnValue;
 }
 
 String getTempSymbol() {
@@ -1268,7 +1378,12 @@ void readSettings() {
     }
   }
   fr.close();
+
+#if defined(USE_MOONRAKER_CLIENT)
+  printerClient.updatePrintClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU, UtcOffset);
+#else
   printerClient.updatePrintClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
+#endif
   weatherClient.updateWeatherApiKey(WeatherApiKey);
   weatherClient.updateLanguage(WeatherLanguage);
   weatherClient.setMetric(IS_METRIC);

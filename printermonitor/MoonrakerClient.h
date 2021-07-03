@@ -27,31 +27,32 @@ SOFTWARE.
 #pragma once
 #include <ESP8266WiFi.h>
 #include "libs/ArduinoJson/ArduinoJson.h"
+#include "TimeLib.h"
 #include <base64.h>
 
-class OctoPrintClient {
+class MoonrakerClient {
 
 private:
   char myServer[100];
-  int myPort = 80;
+  int myPort = 7125;
   String myApiKey = "";
   String encodedAuth = "";
   boolean pollPsu;
-  const String printerType = "OctoPrint";
+  const String printerType = "Moonraker";
 
   void resetPrintData();
   boolean validate();
-  WiFiClient getSubmitRequest(String apiGetData);
-  WiFiClient getPostRequest(String apiPostData, String apiPostBody);
+  WiFiClient getRequest(String apiData, String apiPostBody);
+  void handleParseError();
  
   String result;
 
   typedef struct {
-    String averagePrintTime;
+    String averagePrintTime; // is this in the data?
     String estimatedPrintTime;
     String fileName;
     String fileSize;
-    String lastPrintTime;
+    String lastPrintTime; // is this in the data?
     String progressCompletion;
     String progressFilepos;
     String progressPrintTime;
@@ -72,13 +73,13 @@ private:
   } PrinterStruct;
 
   PrinterStruct printerData;
+  float myUTCOffset;
 
-  
 public:
-  OctoPrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
+  MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu, float utcOffset);
   void getPrinterJobResults();
   void getPrinterPsuState();
-  void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
+  void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu, float utcOffset);
 
   String getAveragePrintTime();
   String getEstimatedPrintTime();
@@ -107,4 +108,5 @@ public:
   int getPrinterPort();
   String getPrinterName();
   void setPrinterName(String printer);
+
 };

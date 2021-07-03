@@ -7,9 +7,12 @@ Now available is the Pre Loaded Monitor Board Kit that comes ready to plug and p
 * Configuration video: https://www.youtube.com/watch?v=kcBspqWhpIU
 
 ## Features:
-* Displays the print status from OctoPrint or Repetier Server
+* Displays the print status from OctoPrint / Repetier / Moonraker Server
 * Option to display time and weather when printer is idle
 * Estimated time remaining
+* Estimated End Time
+* Current Layer
+* Total Layers
 * Time Printing
 * Percentage complete
 * Progress bar
@@ -24,9 +27,11 @@ Now available is the Pre Loaded Monitor Board Kit that comes ready to plug and p
 * Fully configurable from the web interface (not required to update Settings.h)
 * Supports OTA (loading firmware over WiFi connection on same LAN)
 * Basic Authentication to protect your settings
+* Next Scheduled Update
 * Version 2.2 added the ability to update firmware through web interface from a compiled binary
 * Can query the Octoprint [PSU Control plugin](https://plugins.octoprint.org/plugins/psucontrol/) to enter clock or blank mode when PSU is off
 * Repetier support added in version 3.0 -- define in Settings.h
+* Moonraker support added in version 3.1 -- define in Settings.h
 * Video: https://youtu.be/niRv9SCgAPk
 * Detailed build video by Chris Riley: https://youtu.be/Rm-l1FSuJpI
 
@@ -59,6 +64,8 @@ Version 2.2 introduced the ability to upgrade pre-compiled firmware from a binar
 * **printermonitor.ino.d1_mini_repetier_SH1106.bin** - Repetier version compiled for Wemos D1 Mini for the larger 1.3" SH1106 OLED
 * **printermonitor.ino.d1_mini_easyboard.bin** - Version compiled for Easy Monitor Board for the smaller 0.96" SSD1306 OLED (SDA -> D2 and SCL -> D1) 
 * **printermonitor.ino.d1_mini_easyboard_repetier.bin** - Repetier version compiled for Easy Monitor Board for the smaller 0.96" SSD1306 OLED (SDA -> D2 and SCL -> D1)
+* **printermonitor.ino.d1_mini_moonraker_SSD1306.bin** - Moonraker version compiled for Wemos D1 Mini for the smaller 0.96" SSD1306 OLED (default)
+* **printermonitor.ino.d1_mini_moonraker_SH1106.bin** - Moonraker version compiled for Wemos D1 Mini for the larger 1.3" SH1106 OLED
 
 ## Compiling and Loading to Wemos D1 Mini
 It is recommended to use Arduino IDE.  You will need to configure Arduino IDE to work with the Wemos board and USB port and installed the required USB drivers etc.  
@@ -76,7 +83,7 @@ ESP8266WebServer.h
 WiFiManager.h --> https://github.com/tzapu/WiFiManager  
 ESP8266mDNS.h  
 ArduinoOTA.h  --> Arduino OTA Library  
-"SSD1306Wire.h" --> https://github.com/ThingPulse/esp8266-oled-ssd1306/releases/tag/4.1.0  (version 4.1.0)  
+"SSD1306Wire.h" --> https://github.com/ThingPulse/esp8266-oled-ssd1306  
 "OLEDDisplayUi.h"  
 
 Note Printer-Monitor version 2.5 and later include ArduinoJson (version 5.13.1).   
