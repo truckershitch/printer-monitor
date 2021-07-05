@@ -1030,7 +1030,7 @@ void drawScreen5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int
     EstimatedEnd = EstimatedEnd.substring(0, etaHour12Pos) + etaHourBuff + EstimatedEnd.substring(etaHour12Pos + 2, EstEndLen - 4);
   }
   //display->setTextAlignment(TEXT_ALIGN_LEFT);
-  if (EstimatedEnd.length() <= 11) { // no date included 
+  if (EstimatedEnd.length() <= 8) { // no date included 
     display->setFont(ArialMT_Plain_24);
     display->drawString(64 + x, 14 + y, EstimatedEnd);
   }

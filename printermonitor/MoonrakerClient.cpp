@@ -267,10 +267,10 @@ void MoonrakerClient::getPrinterJobResults() {
       int etaHour = hourFormat12(eta); // 12 hour format
 
       if (etaSecs >= 86400) {
-        sprintf(buff, "%02d.%02d.%02d %02d:%02d:%02d ", month(eta), day(eta), year(eta) % 100, etaHour, minute(eta), second(eta));
+        sprintf(buff, "%02d.%02d.%02d %02d:%02d ", month(eta), day(eta), year(eta) % 100, etaHour, minute(eta));
       }
       else {
-        sprintf(buff, "%02d:%02d:%02d ", etaHour, minute(eta), second(eta));
+        sprintf(buff, "%02d:%02d ", etaHour, minute(eta));
       }
       
       // Serial.println("prog_time: " + String(prog_time));
@@ -299,7 +299,12 @@ void MoonrakerClient::getPrinterJobResults() {
     float lh = metaDataRoot["result"]["layer_height"].as<float>();
 
     printerData.totalLayers = String((int)ceil(((h - flh) / lh) + 1));
-    printerData.currentLayer = String((int)ceil((gcode_z_pos - flh) / lh + 1));
+    if (progressPrintTime > 0) {
+      printerData.currentLayer = String((int)ceil((gcode_z_pos - flh) / lh + 1));
+    }
+    else {
+      printerData.currentLayer = "0";
+    }
   }  
 
   if (isPrinting()) {
