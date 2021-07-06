@@ -367,7 +367,7 @@ void findMDNS() {
       IPAddress serverIp = MDNS.IP(i);
       PrinterServer = serverIp.toString();
       PrinterPort = MDNS.port(i); // save the port
-      Serial.println("*** Found Printer Server " + PrinterHostName + " http://" + PrinterServer + ":" + PrinterPort);
+      Serial.println("*** Found Printer Server " + PrinterHostName + " http://" + PrinterServer + ":" + String(PrinterPort));
       writeSettings(); // update the settings
     }
   }

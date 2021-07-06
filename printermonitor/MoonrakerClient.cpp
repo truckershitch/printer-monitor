@@ -259,9 +259,9 @@ void MoonrakerClient::getPrinterJobResults() {
 
     if (progressPrintTime > 0) {
 
-      long prog_time = (long)round(progressCompletion * estimatedTime);
+      long prog_time = progressCompletion * estimatedTime;
       long etaSecs = estimatedTime - prog_time;
-      long eta = etaSecs + printStartTime + totalDuration + (long)round(myUTCOffset) * 3600;
+      long eta = (long)round(etaSecs + printStartTime + totalDuration);
 
       char buff[32];
       int etaHour = hourFormat12(eta); // 12 hour format
@@ -273,12 +273,12 @@ void MoonrakerClient::getPrinterJobResults() {
         sprintf(buff, "%02d:%02d ", etaHour, minute(eta));
       }
       
-      // Serial.println("prog_time: " + String(prog_time));
-      // Serial.println("etaSecs: " + String(etaSecs));
-      // Serial.println("eta: " + String(eta));
-      // Serial.println("printStartTime: " + String(printStartTime));
-      // Serial.println("totalDuration: " + String(totalDuration));
-      // Serial.println("myUTCOffset: " + String(myUTCOffset));
+      Serial.println("prog_time: " + String(prog_time));
+      Serial.println("etaSecs: " + String(etaSecs));
+      Serial.println("eta: " + String(eta));
+      Serial.println("printStartTime: " + String(printStartTime));
+      Serial.println("totalDuration: " + String(totalDuration));
+      Serial.println("myUTCOffset: " + String(myUTCOffset));
       
       printerData.estimatedEndTime = buff;
       if (isAM(eta)) {
@@ -287,6 +287,8 @@ void MoonrakerClient::getPrinterJobResults() {
       else {
         printerData.estimatedEndTime += "PM";
       }
+
+      Serial.println("ETA: " + printerData.estimatedEndTime);
     }
     else {
       printerData.estimatedEndTime = "Unknown";
