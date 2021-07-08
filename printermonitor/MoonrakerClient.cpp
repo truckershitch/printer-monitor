@@ -146,7 +146,7 @@ void MoonrakerClient::getPrinterJobResults() {
   apiGetData += "&extruder=temperature,target";
   apiGetData += "&heater_bed=temperature,target";
   apiGetData += "&virtual_sdcard=progress,file_position";
-  apiGetData += "&print_stats=state,filename,print_duration,filament_used";
+  apiGetData += "&print_stats=state,filename,print_duration,total_duration,filament_used";
   apiGetData += "&gcode_move=gcode_position";
   apiGetData += " HTTP/1.1";
   WiFiClient printClient = getRequest(apiGetData);
@@ -207,6 +207,7 @@ void MoonrakerClient::getPrinterJobResults() {
   printerData.fileName = (const char*)mainDataRoot["print_stats"]["filename"];
   long progressPrintTime = mainDataRoot["print_stats"]["print_duration"].as<long>();
   printerData.progressPrintTime = String(progressPrintTime);
+  long totalDuration = mainDataRoot["print_stats"]["total_duration"].as<long>();
   printerData.filamentLength = (const char*)mainDataRoot["print_stats"]["filament_used"];
   // need for layers
   float gcode_z_pos = mainDataRoot["gcode_move"]["gcode_position"][2].as<float>();
@@ -251,7 +252,6 @@ void MoonrakerClient::getPrinterJobResults() {
     long progressPrintTimeLeft = ceil((1.0 - progressCompletion) * estimatedTime);
     printerData.progressPrintTimeLeft = String(progressPrintTimeLeft);
     long printStartTime = metaDataRoot["result"]["print_start_time"].as<long>();
-    long totalDuration = metaDataRoot["result"]["total_duration"].as<long>();
 
     // Serial.println("estimatedPrintTime: " + printerData.estimatedPrintTime);
     // Serial.println("progressCompletion: " + String(progressCompletion));
@@ -259,26 +259,29 @@ void MoonrakerClient::getPrinterJobResults() {
 
     if (progressPrintTime > 0) {
 
-      long prog_time = progressCompletion * estimatedTime;
-      long etaSecs = estimatedTime - prog_time;
-      long eta = (long)round(etaSecs + printStartTime + totalDuration);
+      // long prog_time = progressCompletion * estimatedTime;
+      // long etaSecs = estimatedTime - prog_time;
+      // long eta = (long)round(etaSecs + printStartTime + totalDuration);
+      long eta = progressPrintTimeLeft + printStartTime + totalDuration + myUTCOffset * 3600;
 
       char buff[32];
       int etaHour = hourFormat12(eta); // 12 hour format
 
-      if (etaSecs >= 86400) {
+      // if (etaSecs >= 86400) {
+      if (progressPrintTimeLeft >= 86400) {
         sprintf(buff, "%02d.%02d.%02d %02d:%02d ", month(eta), day(eta), year(eta) % 100, etaHour, minute(eta));
       }
       else {
         sprintf(buff, "%02d:%02d ", etaHour, minute(eta));
       }
       
-      Serial.println("prog_time: " + String(prog_time));
-      Serial.println("etaSecs: " + String(etaSecs));
+      // Serial.println("prog_time: " + String(prog_time));
+      // Serial.println("etaSecs: " + String(etaSecs));
+      Serial.println("progressPrintTimeLeft: " + String(progressPrintTimeLeft));
       Serial.println("eta: " + String(eta));
       Serial.println("printStartTime: " + String(printStartTime));
       Serial.println("totalDuration: " + String(totalDuration));
-      Serial.println("myUTCOffset: " + String(myUTCOffset));
+      // Serial.println("myUTCOffset: " + String(myUTCOffset));
       
       printerData.estimatedEndTime = buff;
       if (isAM(eta)) {
@@ -293,7 +296,6 @@ void MoonrakerClient::getPrinterJobResults() {
     else {
       printerData.estimatedEndTime = "Unknown";
     }
-    // Serial.println(" estimatedEndTime: " + printerData.estimatedEndTime);
 
     // layers
     float h = metaDataRoot["result"]["object_height"].as<float>();
