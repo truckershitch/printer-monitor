@@ -135,6 +135,27 @@ void MoonrakerClient::handleParseError() {
   printerData.error = "Moonraker Data Parsing failed: " + String(myServer) + ":" + String(myPort);
 }
 
+String MoonrakerClient::urlEncode(String url) {
+  int c;
+	char *hex = "0123456789abcdef";
+  String encoded = "";
+
+	for (int i=0; i < url.length(); i++) {
+    c = int(url[i]);
+		if( ('a' <= c && c <= 'z')
+      || ('A' <= c && c <= 'Z')
+      || ('0' <= c && c <= '9') ) {
+      encoded += url[i];
+		}
+    else {
+			encoded += "%";
+			encoded += char(hex[c >> 4]);
+			encoded += char(hex[c & 15]);
+		}
+	}
+  return encoded;
+}
+
 void MoonrakerClient::getPrinterJobResults() {
   if (!validate()) {
     return;
@@ -220,7 +241,7 @@ void MoonrakerClient::getPrinterJobResults() {
     // fileSize, estimatedPrintTime
     // progressprintTimeLeft, estimatedEndTime,
     // totalLayers, currentLayer
-    apiGetData = "GET /server/files/metadata?filename=" + printerData.fileName + " HTTP/1.1";
+    apiGetData = "GET /server/files/metadata?filename=" + urlEncode(printerData.fileName) + " HTTP/1.1";
     printClient = getRequest(apiGetData);
     if (printerData.error != "") {
       return;

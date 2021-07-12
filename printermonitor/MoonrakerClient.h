@@ -44,6 +44,7 @@ private:
   boolean validate();
   WiFiClient getRequest(String apiData, String apiPostBody);
   void handleParseError();
+  String urlEncode(String url);
  
   String result;
 
