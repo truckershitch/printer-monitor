@@ -91,7 +91,7 @@ boolean displayOn = true;
 #if defined(USE_REPETIER_CLIENT)
   RepetierClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
 #elif defined(USE_MOONRAKER_CLIENT)
-  MoonrakerClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU, UtcOffset);
+  MoonrakerClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
 #else
   OctoPrintClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
 #endif
@@ -387,7 +387,7 @@ void loop() {
     // Check status every 60 seconds
     ledOnOff(true);
     lastMinute = timeClient.getMinutes(); // reset the check value
-    printerClient.getPrinterJobResults();
+    getPrinterJobResults();
     printerClient.getPrinterPsuState();
     ledOnOff(false);
   } else if (printerClient.isPrinting()) {
@@ -395,7 +395,7 @@ void loop() {
       lastSecond = timeClient.getSeconds();
       // every 10 seconds while printing get an update
       ledOnOff(true);
-      printerClient.getPrinterJobResults();
+      getPrinterJobResults();
       printerClient.getPrinterPsuState();
       ledOnOff(false);
     }
@@ -411,6 +411,14 @@ void loop() {
   if (ENABLE_OTA) {
     ArduinoOTA.handle();
   }
+}
+
+void getPrinterJobResults() {
+  #if defined(USE_MOONRAKER_CLIENT)
+    printerClient.getPrinterJobResults(timeClient.getCurrentEpochWithUtcOffset());
+  #else
+    printerClient.getPrinterJobResults();
+  #endif
 }
 
 void getUpdateTime() {
@@ -493,7 +501,7 @@ void handleUpdateConfig() {
   temp.toCharArray(www_password, sizeof(temp));
   writeSettings();
   findMDNS();
-  printerClient.getPrinterJobResults();
+  getPrinterJobResults();
   printerClient.getPrinterPsuState();
   if (INVERT_DISPLAY != flipOld) {
     ui.init();
@@ -1379,11 +1387,7 @@ void readSettings() {
   }
   fr.close();
 
-#if defined(USE_MOONRAKER_CLIENT)
-  printerClient.updatePrintClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU, UtcOffset);
-#else
   printerClient.updatePrintClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
-#endif
   weatherClient.updateWeatherApiKey(WeatherApiKey);
   weatherClient.updateLanguage(WeatherLanguage);
   weatherClient.setMetric(IS_METRIC);

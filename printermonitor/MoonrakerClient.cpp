@@ -26,11 +26,11 @@ SOFTWARE.
 
 #include "MoonrakerClient.h"
 
-MoonrakerClient::MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu, float utcOffset) {
-  updatePrintClient(ApiKey, server, port, user, pass, psu, utcOffset);
+MoonrakerClient::MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu) {
+  updatePrintClient(ApiKey, server, port, user, pass, psu);
 }
 
-void MoonrakerClient::updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu, float utcOffset) {
+void MoonrakerClient::updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu) {
   server.toCharArray(myServer, 100);
   myApiKey = ApiKey;
   myPort = port;
@@ -41,7 +41,6 @@ void MoonrakerClient::updatePrintClient(String ApiKey, String server, int port, 
     encodedAuth = b64.encode(userpass, true);
   }
   pollPsu = psu;
-  myUTCOffset = utcOffset;
 }
 
 boolean MoonrakerClient::validate() {
@@ -156,7 +155,7 @@ String MoonrakerClient::urlEncode(String url) {
   return encoded;
 }
 
-void MoonrakerClient::getPrinterJobResults() {
+void MoonrakerClient::getPrinterJobResults(long utcOffsetEpoch) {
   if (!validate()) {
     return;
   }
@@ -274,21 +273,12 @@ void MoonrakerClient::getPrinterJobResults() {
     printerData.progressPrintTimeLeft = String(progressPrintTimeLeft);
     long printStartTime = metaDataRoot["result"]["print_start_time"].as<long>();
 
-    // Serial.println("estimatedPrintTime: " + printerData.estimatedPrintTime);
-    // Serial.println("progressCompletion: " + String(progressCompletion));
-    // Serial.println("progressPrintTimeLeft: " + printerData.progressPrintTimeLeft);
-
     if (progressPrintTime > 0) {
-
-      // long prog_time = progressCompletion * estimatedTime;
-      // long etaSecs = estimatedTime - prog_time;
-      // long eta = (long)round(etaSecs + printStartTime + totalDuration);
-      long eta = progressPrintTimeLeft + printStartTime + totalDuration + myUTCOffset * 3600;
+      long eta = utcOffsetEpoch + totalDuration;
 
       char buff[32];
       int etaHour = hourFormat12(eta); // 12 hour format
 
-      // if (etaSecs >= 86400) {
       if (progressPrintTimeLeft >= 86400) {
         sprintf(buff, "%02d.%02d.%02d %02d:%02d ", month(eta), day(eta), year(eta) % 100, etaHour, minute(eta));
       }
@@ -296,13 +286,11 @@ void MoonrakerClient::getPrinterJobResults() {
         sprintf(buff, "%02d:%02d ", etaHour, minute(eta));
       }
       
-      // Serial.println("prog_time: " + String(prog_time));
-      // Serial.println("etaSecs: " + String(etaSecs));
+      Serial.println("utcOffsetEpoch: "  + String(utcOffsetEpoch));
       Serial.println("progressPrintTimeLeft: " + String(progressPrintTimeLeft));
       Serial.println("eta: " + String(eta));
       Serial.println("printStartTime: " + String(printStartTime));
       Serial.println("totalDuration: " + String(totalDuration));
-      // Serial.println("myUTCOffset: " + String(myUTCOffset));
       
       printerData.estimatedEndTime = buff;
       if (isAM(eta)) {

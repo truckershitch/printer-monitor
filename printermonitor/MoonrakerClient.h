@@ -28,6 +28,7 @@ SOFTWARE.
 #include <ESP8266WiFi.h>
 #include "libs/ArduinoJson/ArduinoJson.h"
 #include "TimeLib.h"
+#include "TimeClient.h"
 #include <base64.h>
 
 class MoonrakerClient {
@@ -74,13 +75,12 @@ private:
   } PrinterStruct;
 
   PrinterStruct printerData;
-  float myUTCOffset;
 
 public:
-  MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu, float utcOffset);
-  void getPrinterJobResults();
+  MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
+  void getPrinterJobResults(long utcOffsetEpoch);
   void getPrinterPsuState();
-  void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu, float utcOffset);
+  void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
 
   String getAveragePrintTime();
   String getEstimatedPrintTime();
