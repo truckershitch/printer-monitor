@@ -78,7 +78,7 @@ private:
 
 public:
   MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
-  void getPrinterJobResults(long utcOffsetEpoch);
+  void getPrinterJobResults(float utcOffset);
   void getPrinterPsuState();
   void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
 

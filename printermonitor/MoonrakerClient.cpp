@@ -155,7 +155,7 @@ String MoonrakerClient::urlEncode(String url) {
   return encoded;
 }
 
-void MoonrakerClient::getPrinterJobResults(long utcOffsetEpoch) {
+void MoonrakerClient::getPrinterJobResults(float utcOffset) {
   if (!validate()) {
     return;
   }
@@ -274,7 +274,7 @@ void MoonrakerClient::getPrinterJobResults(long utcOffsetEpoch) {
     long printStartTime = metaDataRoot["result"]["print_start_time"].as<long>();
 
     if (progressPrintTime > 0) {
-      long eta = utcOffsetEpoch + totalDuration;
+      long eta = now() + utcOffset * 3600 +  progressPrintTimeLeft;
 
       char buff[32];
       int etaHour = hourFormat12(eta); // 12 hour format
@@ -286,9 +286,10 @@ void MoonrakerClient::getPrinterJobResults(long utcOffsetEpoch) {
         sprintf(buff, "%02d:%02d ", etaHour, minute(eta));
       }
       
-      Serial.println("utcOffsetEpoch: "  + String(utcOffsetEpoch));
+      Serial.println("utcOffset: "  + String(utcOffset));
       Serial.println("progressPrintTimeLeft: " + String(progressPrintTimeLeft));
-      Serial.println("eta: " + String(eta));
+      Serial.println("raw eta: " + String(eta));
+      Serial.println("friendly eta: ") + String(buff);
       Serial.println("printStartTime: " + String(printStartTime));
       Serial.println("totalDuration: " + String(totalDuration));
       

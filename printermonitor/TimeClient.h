@@ -30,6 +30,7 @@ Modified by David Payne for use in the Scrolling Marquee
 #pragma once
 
 #include <ESP8266WiFi.h>
+#include <TimeLib.h>
 
 #define NTP_PACKET_SIZE 48
 
@@ -42,6 +43,11 @@ class TimeClient {
     const char* ntpServerName = "www.google.com";
     const int httpPort = 80;    
     byte packetBuffer[ NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
+    const char *shortmonth[12] = {
+      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+    };
+    int lookupMonth(char *mon);
 
   public:
     TimeClient(float utcOffset);

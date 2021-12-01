@@ -31,6 +31,16 @@ TimeClient::TimeClient(float utcOffset) {
   myUtcOffset = utcOffset;
 }
 
+int TimeClient::lookupMonth(char *mon) {
+  char char_arr[4];
+  strcpy(char_arr, mon);
+  for(int i = 0; i < 12; i++) {
+    if (strcmp(char_arr, shortmonth[i]) == 0) {
+      return i + 1;
+    }
+  }
+}
+
 void TimeClient::updateTime() {
   WiFiClient client;
   
@@ -65,7 +75,14 @@ void TimeClient::updateTime() {
         int parsedHours = line.substring(23, 25).toInt();
         int parsedMinutes = line.substring(26, 28).toInt();
         int parsedSeconds = line.substring(29, 31).toInt();
+        char rawMonth[4];
+        strcpy(rawMonth, line.substring(14, 17).c_str());
+        int parsedMonth = lookupMonth(rawMonth);
+        int parsedDay = line.substring(11, 13).toInt();
+        int parsedYear = line.substring(18, 22).toInt();
+        Serial.print(String(parsedMonth) + "/" + String(parsedDay) + "/" + String(parsedYear) + " ");
         Serial.println(String(parsedHours) + ":" + String(parsedMinutes) + ":" + String(parsedSeconds));
+        setTime(parsedHours, parsedMinutes, parsedSeconds, parsedMonth, parsedDay, parsedYear);
 
         localEpoc = (parsedHours * 60 * 60 + parsedMinutes * 60 + parsedSeconds);
         Serial.println(localEpoc);
@@ -148,5 +165,5 @@ long TimeClient::getCurrentEpoch() {
 }
 
 long TimeClient::getCurrentEpochWithUtcOffset() {
-  return getCurrentEpoch() + 3600 * myUtcOffset;
+  return (long)round(getCurrentEpoch() + 3600 * myUtcOffset + 86400L) % 86400L;
 }

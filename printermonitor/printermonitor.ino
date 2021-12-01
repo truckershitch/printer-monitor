@@ -415,7 +415,7 @@ void loop() {
 
 void getPrinterJobResults() {
   #if defined(USE_MOONRAKER_CLIENT)
-    printerClient.getPrinterJobResults(timeClient.getCurrentEpochWithUtcOffset());
+    printerClient.getPrinterJobResults(UtcOffset);
   #else
     printerClient.getPrinterJobResults();
   #endif
