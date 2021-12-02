@@ -319,6 +319,9 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     else {
       printerData.currentLayer = "0";
     }
+    if (printerData.currentLayer > printerData.totalLayers) {
+      printerData.currentLayer = printerData.totalLayers;
+    }
   }  
 
   if (isPrinting()) {
