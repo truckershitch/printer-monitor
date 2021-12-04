@@ -98,7 +98,7 @@ WiFiClient MoonrakerClient::getRequest(String apiData, String apiPostBody="") {
       printerData.error = "Connection to " + String(myServer) + ":" + String(myPort) + " failed.";
       return printClient;
     }
-  } 
+  }
   else {
     Serial.println("Connection to Moonraker failed: " + String(myServer) + ":" + String(myPort)); //error message if no client connect
     Serial.println();
@@ -231,7 +231,7 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
   printerData.filamentLength = (const char*)mainDataRoot["print_stats"]["filament_used"];
   // need for layers
   float gcode_z_pos = mainDataRoot["gcode_move"]["gcode_position"][2].as<float>();
-  
+
   // NOT USED RIGHT NOW
   printerData.averagePrintTime = "";
   printerData.lastPrintTime = "";
@@ -260,7 +260,7 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
       printerData.currentLayer = "";
       return;
     }
-  
+
     Serial.print("metaDataRoot: ");
     metaDataRoot.printTo(Serial);
     Serial.println();
@@ -274,7 +274,8 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     long printStartTime = metaDataRoot["result"]["print_start_time"].as<long>();
 
     if (progressPrintTime > 0) {
-      long eta = now() + utcOffset * 3600 +  progressPrintTimeLeft;
+      long epoch = now();
+      long eta = epoch + utcOffset * 3600 +  progressPrintTimeLeft;
 
       char buff[32];
       int etaHour = hourFormat12(eta); // 12 hour format
@@ -285,14 +286,15 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
       else {
         sprintf(buff, "%02d:%02d ", etaHour, minute(eta));
       }
-      
-      Serial.println("utcOffset: "  + String(utcOffset));
+
       Serial.println("progressPrintTimeLeft: " + String(progressPrintTimeLeft));
+      Serial.println("epoch: " + String(epoch));
+      Serial.println("utcOffset: "  + String(utcOffset));
       Serial.println("raw eta: " + String(eta));
-      Serial.println("friendly eta: ") + String(buff);
+      Serial.println("friendly eta: " + String(buff));
       Serial.println("printStartTime: " + String(printStartTime));
       Serial.println("totalDuration: " + String(totalDuration));
-      
+
       printerData.estimatedEndTime = buff;
       if (isAM(eta)) {
         printerData.estimatedEndTime += "AM";
@@ -312,17 +314,21 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     float flh = metaDataRoot["result"]["first_layer_height"].as<float>();
     float lh = metaDataRoot["result"]["layer_height"].as<float>();
 
-    printerData.totalLayers = String((int)ceil(((h - flh) / lh) + 1));
+    int totalLayers = (int)ceil(((h - flh) / lh) + 1);
+    int currentLayer = (int)ceil((gcode_z_pos - flh) / lh + 1);
+    printerData.totalLayers = String(totalLayers);
     if (progressPrintTime > 0) {
-      printerData.currentLayer = String((int)ceil((gcode_z_pos - flh) / lh + 1));
+      if (currentLayer > totalLayers) {
+        printerData.currentLayer = printerData.totalLayers;
+      }
+      else {
+        printerData.currentLayer = String(currentLayer);
+      }
     }
     else {
       printerData.currentLayer = "0";
     }
-    if (printerData.currentLayer > printerData.totalLayers) {
-      printerData.currentLayer = printerData.totalLayers;
-    }
-  }  
+  }
 
   if (isPrinting()) {
     Serial.println("Status: " + printerData.state + " " + printerData.fileName + "(" + printerData.progressCompletion + "%)");
@@ -352,7 +358,7 @@ void MoonrakerClient::getPrinterPsuState() {
     }
     const size_t bufferSizePSU = JSON_OBJECT_SIZE(2) + 300;
     DynamicJsonBuffer jsonBufferPSU(bufferSizePSU);
-  
+
     // Parse JSON object
     JsonObject& psuRoot = jsonBufferPSU.parseObject(printClient);
     if (!psuRoot.success()) {
@@ -363,7 +369,7 @@ void MoonrakerClient::getPrinterPsuState() {
     Serial.print("psuRoot: ");
     psuRoot.printTo(Serial);
     Serial.println();
-  
+
     String psu = (const char*)psuRoot["printer"];
     if (psu == "on") {
       printerData.isPSUoff = false; // PSU checked and is on
@@ -440,7 +446,7 @@ String MoonrakerClient::getProgressCompletion() {
 }
 
 String MoonrakerClient::getProgressFilepos() {
-  return printerData.progressFilepos;  
+  return printerData.progressFilepos;
 }
 
 String MoonrakerClient::getProgressPrintTime() {
