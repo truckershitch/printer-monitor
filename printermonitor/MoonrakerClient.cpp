@@ -228,7 +228,8 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
   long progressPrintTime = mainDataRoot["print_stats"]["print_duration"].as<long>();
   printerData.progressPrintTime = String(progressPrintTime);
   long totalDuration = mainDataRoot["print_stats"]["total_duration"].as<long>();
-  printerData.filamentLength = (const char*)mainDataRoot["print_stats"]["filament_used"];
+  float filamentLength = mainDataRoot["print_stats"]["filament_used"].as<float>();
+  printerData.filamentLength = String(filamentLength);
   // need for layers
   float gcode_z_pos = mainDataRoot["gcode_move"]["gcode_position"][2].as<float>();
 
@@ -255,7 +256,7 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
       printerData.fileSize = "";
       printerData.estimatedPrintTime = "";
       printerData.progressPrintTimeLeft = "";
-      printerData.estimatedEndTime = "Unknown";
+      // printerData.estimatedEndTime = "Unknown";
       printerData.totalLayers = "";
       printerData.currentLayer = "";
       return;
@@ -269,14 +270,64 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     // times
     long estimatedTime = metaDataRoot["result"]["estimated_time"].as<long>();
     printerData.estimatedPrintTime = String(estimatedTime);
-    long progressPrintTimeLeft = ceil((1.0 - progressCompletion) * estimatedTime);
+
+    // long progressPrintTimeLeft = ceil((1.0 - progressCompletion) * estimatedTime);
+
+    /*  
+      This code gives much longer ETA
+      See mainsail source on github: /src/store/printer/getters.ts
+      filament_total not available to moonraker api
+    */
+
+    // Grab time epoch from Moonraker
+    apiGetData = "GET /machine/proc_stats HTTP/1.1";
+    printClient = getRequest(apiGetData);
+    if (printerData.error != "") {
+      return;
+    }
+    const size_t BufferSizeProcStats = JSON_ARRAY_SIZE(0) + JSON_ARRAY_SIZE(30) + 2*JSON_OBJECT_SIZE(2) + 2*JSON_OBJECT_SIZE(3) + 30*JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(6) + 5130;
+    DynamicJsonBuffer jsonProcStatsData(BufferSizeProcStats);
+
+    // Parse JSON object
+    JsonObject& metaDataRoot2 = jsonProcStatsData.parseObject(printClient);
+    if (!metaDataRoot2.success()) {
+      handleParseError();
+      printerData.estimatedEndTime = "Unknown";
+      return;
+    }
+
+    // Parse JSON object
+    double piEpoch = metaDataRoot2["result"]["moonraker_stats"][0]["time"];    
+
+    float etaFile = 0;
+    if (progressPrintTime > 0 && progressCompletion > 0) {
+      etaFile = (float)(progressPrintTime / progressCompletion - progressPrintTime);
+    }
+    float etaSlicer = 0;
+    if (estimatedTime > progressPrintTime) {
+      etaSlicer = (float)(estimatedTime - progressPrintTime);
+    }
+
+    long progressPrintTimeLeft = 0;
+    float etaTime = 0;
+    long timeCount = 0;
+
+    if (etaFile > 0) {
+      etaTime += etaFile;
+      timeCount++;
+    }
+    if (etaSlicer > 0) {
+      etaTime += etaSlicer;
+      timeCount++;
+    }
+    if (etaTime > 0 && timeCount > 0) {
+      progressPrintTimeLeft = ceil(etaTime / timeCount);
+    }
+
     printerData.progressPrintTimeLeft = String(progressPrintTimeLeft);
-    long printStartTime = metaDataRoot["result"]["print_start_time"].as<long>();
 
     if (progressPrintTime > 0) {
-      long epoch = now();
-      long eta = epoch + utcOffset * 3600 +  progressPrintTimeLeft;
-
+      long eta = ceil(piEpoch) + utcOffset * 3600 +  progressPrintTimeLeft;
       char buff[32];
       int etaHour = hourFormat12(eta); // 12 hour format
 
@@ -288,11 +339,10 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
       }
 
       Serial.println("progressPrintTimeLeft: " + String(progressPrintTimeLeft));
-      Serial.println("epoch: " + String(epoch));
+      Serial.println("piEpoch: " + String(piEpoch));
       Serial.println("utcOffset: "  + String(utcOffset));
       Serial.println("raw eta: " + String(eta));
       Serial.println("friendly eta: " + String(buff));
-      Serial.println("printStartTime: " + String(printStartTime));
       Serial.println("totalDuration: " + String(totalDuration));
 
       printerData.estimatedEndTime = buff;
