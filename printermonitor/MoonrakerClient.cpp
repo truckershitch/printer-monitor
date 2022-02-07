@@ -165,7 +165,8 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
   apiGetData += "webhooks";
   apiGetData += "&extruder=temperature,target";
   apiGetData += "&heater_bed=temperature,target";
-  apiGetData += "&virtual_sdcard=progress,file_position";
+  apiGetData += "&virtual_sdcard=file_position";
+  apiGetData += "&display_status=progress";
   apiGetData += "&print_stats=state,filename,print_duration,total_duration,filament_used";
   apiGetData += "&gcode_move=gcode_position";
   apiGetData += " HTTP/1.1";
@@ -221,9 +222,10 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
   printerData.toolTargetTemp = (const char*)mainDataRoot["extruder"]["target"];
   printerData.bedTemp = (const char*)mainDataRoot["heater_bed"]["temperature"];
   printerData.bedTargetTemp = (const char*)mainDataRoot["heater_bed"]["target"];
-  float progressCompletion = mainDataRoot["virtual_sdcard"]["progress"].as<float>();
+  float progressCompletion = mainDataRoot["display_status"]["progress"].as<float>();
   printerData.progressCompletion = String(progressCompletion * 100.0);
-  printerData.progressFilepos = (const char*)mainDataRoot["virtual_sdcard"]["file_position"];
+  long filePos = mainDataRoot["virtual_sdcard"]["file_position"].as<long>();
+  printerData.progressFilepos = String(filePos);
   printerData.fileName = (const char*)mainDataRoot["print_stats"]["filename"];
   long progressPrintTime = mainDataRoot["print_stats"]["print_duration"].as<long>();
   printerData.progressPrintTime = String(progressPrintTime);
@@ -266,7 +268,28 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     metaDataRoot.printTo(Serial);
     Serial.println();
 
-    printerData.fileSize = (const char*)metaDataRoot["result"]["size"];
+    /*
+    // subtract the length of any thumbnails, if present,
+    // to give proper % progress
+    long thumbsTotalSize = 0;
+    JsonVariant thumbs = metaDataRoot["result"]["thumbnails"];
+    if (thumbs.success()) {
+      for (int i=0; i < thumbs.size(); i++) {
+        thumbsTotalSize += thumbs[i]["size"].as<long>();
+      }
+      // thumbnails are base64 encoded => approximately 133% more space.
+      thumbsTotalSize = ceil(thumbsTotalSize * 1.33); // not used
+    }
+    Serial.println("thumbsTotalSize: " + String(thumbsTotalSize));
+    */
+
+    long fileSize = metaDataRoot["result"]["size"].as<long>();
+    printerData.fileSize = String(fileSize);
+    
+    long gcStart = metaDataRoot["result"]["gcode_start_byte"].as<long>();
+    long gcEnd = metaDataRoot["result"]["gcode_end_byte"].as<long>();
+    long gcSize = gcEnd -gcStart;
+
     // times
     long estimatedTime = metaDataRoot["result"]["estimated_time"].as<long>();
     printerData.estimatedPrintTime = String(estimatedTime);
@@ -274,7 +297,6 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     // long progressPrintTimeLeft = ceil((1.0 - progressCompletion) * estimatedTime);
 
     /*  
-      This code gives much longer ETA
       See mainsail source on github: /src/store/printer/getters.ts
       filament_total not available to moonraker api
     */
@@ -299,23 +321,29 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     // Parse JSON object
     double piEpoch = metaDataRoot2["result"]["moonraker_stats"][0]["time"];    
 
-    float etaFile = 0;
-    if (progressPrintTime > 0 && progressCompletion > 0) {
-      etaFile = (float)(progressPrintTime / progressCompletion - progressPrintTime);
+    // float etaFile = 0.0;
+    if (progressPrintTime > 0 && filePos > gcStart) {
+      progressCompletion = (float)(filePos - gcStart) / (float)gcSize;
+      printerData.progressCompletion = String(progressCompletion * 100.0);
+      // etaFile = totalDuration / progressCompletion - totalDuration;
     }
-    float etaSlicer = 0;
+    else {
+      printerData.progressCompletion = String(0.0);
+    }
+    
+    float etaSlicer = 0.0;
     if (estimatedTime > progressPrintTime) {
       etaSlicer = (float)(estimatedTime - progressPrintTime);
     }
 
     long progressPrintTimeLeft = 0;
-    float etaTime = 0;
+    float etaTime = 0.0;
     long timeCount = 0;
 
-    if (etaFile > 0) {
-      etaTime += etaFile;
-      timeCount++;
-    }
+    // if (etaFile > 0) {
+    //   etaTime += etaFile;
+    //   timeCount++;
+    // }
     if (etaSlicer > 0) {
       etaTime += etaSlicer;
       timeCount++;
@@ -323,6 +351,16 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     if (etaTime > 0 && timeCount > 0) {
       progressPrintTimeLeft = ceil(etaTime / timeCount);
     }
+
+    Serial.println("progressPrintTime: " + String(progressPrintTime));
+    Serial.println("fileSize: " + String(fileSize));
+    Serial.println("gcSize: " + String(gcSize));
+    Serial.println("gcStart : " + String(gcStart));
+    Serial.println("filePos: " + String(filePos));
+    Serial.println("totalDuration: " + String(totalDuration));
+    // Serial.println("etaFile: " + String(etaFile));
+    Serial.println("etaSlicer: " + String(etaSlicer));
+    Serial.println("progressCompletion : " + printerData.progressCompletion);
 
     printerData.progressPrintTimeLeft = String(progressPrintTimeLeft);
 
@@ -341,7 +379,7 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
       Serial.println("progressPrintTimeLeft: " + String(progressPrintTimeLeft));
       Serial.println("piEpoch: " + String(piEpoch));
       Serial.println("utcOffset: "  + String(utcOffset));
-      Serial.println("raw eta: " + String(eta));
+      Serial.println("eta timestamp: " + String(eta));
       Serial.println("friendly eta: " + String(buff));
       Serial.println("totalDuration: " + String(totalDuration));
 
@@ -367,7 +405,7 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     int totalLayers = (int)ceil(((h - flh) / lh) + 1);
     int currentLayer = (int)ceil((gcode_z_pos - flh) / lh + 1);
     printerData.totalLayers = String(totalLayers);
-    if (progressPrintTime > 0) {
+    if (progressPrintTime > 0 && filePos > gcStart) {
       if (currentLayer > totalLayers) {
         printerData.currentLayer = printerData.totalLayers;
       }
