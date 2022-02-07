@@ -1,3 +1,12 @@
+# Try to port display to ILI9341
+
+Reference libraries
+* https://github.com/truckershitch/printer-monitor
+* https://github.com/ThingPulse/minigrafx
+* https://github.com/ThingPulse/esp8266-weather-station-color
+
+=================================================================
+
 # Printer Monitor (OctoPrint 3D Printer Monitor)
 
 ## New Easy Monitor Board Kit:
