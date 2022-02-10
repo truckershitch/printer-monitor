@@ -288,7 +288,8 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     
     long gcStart = metaDataRoot["result"]["gcode_start_byte"].as<long>();
     long gcEnd = metaDataRoot["result"]["gcode_end_byte"].as<long>();
-    long gcSize = gcEnd -gcStart;
+    long gcSize = gcEnd - gcStart;
+    float filamentTotal = metaDataRoot["result"]["filament_total"].as<float>();
 
     // times
     long estimatedTime = metaDataRoot["result"]["estimated_time"].as<long>();
@@ -297,8 +298,8 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     // long progressPrintTimeLeft = ceil((1.0 - progressCompletion) * estimatedTime);
 
     /*  
-      See mainsail source on github: /src/store/printer/getters.ts
-      filament_total not available to moonraker api
+      See mainsail source on github:
+      https://github.com/mainsail-crew/mainsail/blob/develop/src/store/printer/getters.ts
     */
 
     // Grab time epoch from Moonraker
@@ -321,35 +322,38 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     // Parse JSON object
     double piEpoch = metaDataRoot2["result"]["moonraker_stats"][0]["time"];    
 
-    // float etaFile = 0.0;
+    float etaFile = 0.0;
+    float etaFilament = 0.0;
+    float etaSlicer = 0.0;
     if (progressPrintTime > 0 && filePos > gcStart) {
-      progressCompletion = (float)(filePos - gcStart) / (float)gcSize;
-      printerData.progressCompletion = String(progressCompletion * 100.0);
-      // etaFile = totalDuration / progressCompletion - totalDuration;
+      progressCompletion = (float)(filePos - gcStart) / gcSize;
+      printerData.progressCompletion = String((int)(progressCompletion * 100 + 0.5));
+
+      etaFile = totalDuration / progressCompletion - totalDuration;
+      etaFilament = totalDuration / filamentLength * (filamentTotal - filamentLength);
+      etaSlicer = (float)(estimatedTime - progressPrintTime);
     }
     else {
       printerData.progressCompletion = String(0.0);
     }
     
-    float etaSlicer = 0.0;
-    if (estimatedTime > progressPrintTime) {
-      etaSlicer = (float)(estimatedTime - progressPrintTime);
-    }
-
     long progressPrintTimeLeft = 0;
     float etaTime = 0.0;
     long timeCount = 0;
-
-    // if (etaFile > 0) {
-    //   etaTime += etaFile;
-    //   timeCount++;
-    // }
+    if (etaFile > 0) {
+      etaTime += etaFile;
+      timeCount++;
+    }
+    if (etaFilament > 0) {
+      etaTime += etaFilament;
+      timeCount++;
+    }
     if (etaSlicer > 0) {
       etaTime += etaSlicer;
       timeCount++;
     }
     if (etaTime > 0 && timeCount > 0) {
-      progressPrintTimeLeft = ceil(etaTime / timeCount);
+      progressPrintTimeLeft = (long)(etaTime / timeCount + 0.5);
     }
 
     Serial.println("progressPrintTime: " + String(progressPrintTime));
@@ -358,14 +362,17 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     Serial.println("gcStart : " + String(gcStart));
     Serial.println("filePos: " + String(filePos));
     Serial.println("totalDuration: " + String(totalDuration));
-    // Serial.println("etaFile: " + String(etaFile));
+    Serial.println("filamentLength: " + String(filamentLength));
+    Serial.println("filamentTotal: " + String(filamentTotal));
+    Serial.println("etaFile: " + String(etaFile));
+    Serial.println("etaFilament: " + String(etaFilament));
     Serial.println("etaSlicer: " + String(etaSlicer));
-    Serial.println("progressCompletion : " + printerData.progressCompletion);
+    Serial.println("progressCompletion : " + String(progressCompletion));
 
     printerData.progressPrintTimeLeft = String(progressPrintTimeLeft);
 
     if (progressPrintTime > 0) {
-      long eta = ceil(piEpoch) + utcOffset * 3600 +  progressPrintTimeLeft;
+      long eta = (long)(piEpoch + utcOffset * 3600 + progressPrintTimeLeft + 0.5);
       char buff[32];
       int etaHour = hourFormat12(eta); // 12 hour format
 
@@ -419,7 +426,7 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
   }
 
   if (isPrinting()) {
-    Serial.println("Status: " + printerData.state + " " + printerData.fileName + "(" + printerData.progressCompletion + "%)");
+    Serial.println("Status: " + printerData.state + " " + printerData.fileName + "(" + String(progressCompletion) + "%)");
   }
 }
 
