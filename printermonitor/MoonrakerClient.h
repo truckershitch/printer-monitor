@@ -28,7 +28,6 @@ SOFTWARE.
 #include <ESP8266WiFi.h>
 #include "libs/ArduinoJson/ArduinoJson.h"
 #include "TimeLib.h"
-#include "TimeClient.h"
 #include <base64.h>
 
 class MoonrakerClient {
@@ -43,6 +42,7 @@ private:
 
   void resetPrintData();
   boolean validate();
+  float avgCheck(float check, float val1, float val2);
   WiFiClient getRequest(String apiData, String apiPostBody);
   void handleParseError();
   String urlEncode(String url);
@@ -78,7 +78,7 @@ private:
 
 public:
   MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
-  void getPrinterJobResults(float utcOffset);
+  void getPrinterJobResults();
   void getPrinterPsuState();
   void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
 

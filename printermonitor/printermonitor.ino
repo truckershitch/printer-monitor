@@ -78,7 +78,7 @@ OverlayCallback clockOverlay[] = { drawClockHeaderOverlay };
 int numberOfOverlays = 1;
 
 // Time 
-TimeClient timeClient(UtcOffset);
+TimeHandler timeHandler(UtcOffset, TZ, NtpServer);
 long lastEpoch = 0;
 long firstEpoch = 0;
 long displayOffEpoch = 0;
@@ -126,6 +126,7 @@ static const char CLOCK_FORM[] PROGMEM = "<hr><p><input name='isClockEnabled' cl
                             
 static const char THEME_FORM[] PROGMEM =   "<p>Theme Color <select class='w3-option w3-padding' name='theme'>%THEME_OPTIONS%</select></p>"
                       "<p><label>UTC Time Offset</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='utcoffset' value='%UTCOFFSET%' maxlength='12'></p><hr>"
+                      "<p><label>NTP Server</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='ntpserver' value='%NTPSERVER%'></p><hr>"
                       "<p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
                       "<p><label>User ID (for this interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
                       "<p><label>Password </label><input class='w3-input w3-border w3-margin-bottom' type='password' name='stationpassword' value='%STATIONPASSWORD%'></p>"
@@ -382,17 +383,16 @@ void loop() {
   if((getMinutesFromLastRefresh() >= minutesBetweenDataRefresh) || lastEpoch == 0) {
     getUpdateTime();
   }
-
-  if (lastMinute != timeClient.getMinutes() && !printerClient.isPrinting()) {
+    if (lastMinute != String(minute()) && !printerClient.isPrinting()) {
     // Check status every 60 seconds
     ledOnOff(true);
-    lastMinute = timeClient.getMinutes(); // reset the check value
+    lastMinute = String(minute()); // reset the check value
     getPrinterJobResults();
     printerClient.getPrinterPsuState();
     ledOnOff(false);
   } else if (printerClient.isPrinting()) {
-    if (lastSecond != timeClient.getSeconds() && timeClient.getSeconds().endsWith("0")) {
-      lastSecond = timeClient.getSeconds();
+    if (lastSecond != String(second()) && String(second()).endsWith("0")) {
+      lastSecond = String(second());
       // every 10 seconds while printing get an update
       ledOnOff(true);
       getPrinterJobResults();
@@ -414,11 +414,11 @@ void loop() {
 }
 
 void getPrinterJobResults() {
-  #if defined(USE_MOONRAKER_CLIENT)
-    printerClient.getPrinterJobResults(UtcOffset);
-  #else
+  // #if defined(USE_MOONRAKER_CLIENT)
+    // printerClient.getPrinterJobResults(UtcOffset);
+  // #else
     printerClient.getPrinterJobResults();
-  #endif
+  // #endif
 }
 
 void getUpdateTime() {
@@ -432,9 +432,9 @@ void getUpdateTime() {
 
   Serial.println("Updating Time...");
   //Update the Time
-  timeClient.updateTime();
-  lastEpoch = timeClient.getCurrentEpoch();
-  Serial.println("Local time: " + timeClient.getAmPmFormattedTime());
+  timeHandler.updateTime();
+  lastEpoch = now();
+  Serial.println("Local time: " + timeHandler.getDisplayTime(lastEpoch, false, true) + " " + timeHandler.getAMPM(now()));
 
   ledOnOff(false);  // turn off the LED
 }
@@ -677,6 +677,7 @@ void handleConfigure() {
   themeOptions.replace(">"+String(themeColor)+"<", " selected>"+String(themeColor)+"<");
   form.replace("%THEME_OPTIONS%", themeOptions);
   form.replace("%UTCOFFSET%", String(UtcOffset));
+  form.replace("%NTPSERVER%", NtpServer);
   String isUseSecurityChecked = "";
   if (IS_BASIC_AUTH) {
     isUseSecurityChecked = "checked='checked'";
@@ -786,11 +787,11 @@ void displayPrinterStatus() {
   server.send(200, "text/html", "");
   server.sendContent(String(getHeader(true)));
 
-  String displayTime = timeClient.getAmPmHours() + ":" + timeClient.getMinutes() + ":" + timeClient.getSeconds() + " " + timeClient.getAmPm();
-  if (IS_24HOUR) {
-    displayTime = timeClient.getHours() + ":" + timeClient.getMinutes() + ":" + timeClient.getSeconds();
+  String displayTime = timeHandler.getDisplayTime(now(), IS_24HOUR, true);
+  if (isAM()) {
+    displayTime = displayTime + " " + timeHandler.getAMPM(now());
   }
-  
+
   html += "<div class='w3-cell-row' style='width:100%'><h2>" + printerClient.getPrinterType() + " Monitor</h2></div><div class='w3-cell-row'>";
   html += "<div class='w3-cell w3-container' style='width:100%'><p>";
   if (printerClient.getPrinterType() == "Repetier") {
@@ -1011,50 +1012,52 @@ void drawScreen4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int
 }
 
 void drawScreen5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  
+  // estimatedEndTime comes in 24 hour "HH:MM" format
   String EstimatedEnd = printerClient.getEstimatedEndTime();
+  int estEndLen = EstimatedEnd.length();
+
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->setFont(ArialMT_Plain_16);
 
   display->drawString(64 + x, 0 + y, "End Time");
 
-  if (IS_24HOUR) {
-    int etaHour;
-    char etaHourBuff[2];
-    int EstEndLen = EstimatedEnd.length();
-    int etaHour12Pos = EstEndLen - 8;
+  if (!IS_24HOUR && EstimatedEnd != "Unknown") {
+    int etaHour24;
+    int etaHour24Pos = estEndLen - 5;
+    String etaHour12;
+    String suffix = " AM";
 
-    etaHour = EstimatedEnd.substring(etaHour12Pos, etaHour12Pos + 1).toInt();
-    if (EstimatedEnd.substring(EstEndLen - 2, 2) == "PM") {
-      if (etaHour >= 1 && etaHour <= 11) {
-        etaHour += 12;
-      }
+    etaHour24 = EstimatedEnd.substring(etaHour24Pos, 2).toInt();
+    if (etaHour24 > 12) {
+      etaHour12 = String(etaHour24 - 12);
+      suffix = String(" PM");
     }
-    else if (etaHour == 12) {
-      etaHour = 0;
+    else if (etaHour24 == 0) {
+      etaHour12 = String("12");
     }
-    sprintf(etaHourBuff, "%02d", etaHour);
+    else {
+      etaHour12 = String(etaHour24);
+    }
 
-    EstimatedEnd = EstimatedEnd.substring(0, etaHour12Pos) + etaHourBuff + EstimatedEnd.substring(etaHour12Pos + 2, EstEndLen - 4);
+    EstimatedEnd = etaHour12 + EstimatedEnd.substring(etaHour24Pos + 2) + suffix;
   }
+
   //display->setTextAlignment(TEXT_ALIGN_LEFT);
-  if (EstimatedEnd.length() <= 8) { // no date included 
+  if (estEndLen <= 8) { // no date included 
     display->setFont(ArialMT_Plain_24);
     display->drawString(64 + x, 14 + y, EstimatedEnd);
   }
   else {
     display->setFont(ArialMT_Plain_16);
-    display->drawString(12 + x, 14 + y, EstimatedEnd);
+    display->drawString(48 + x, 18 + y, EstimatedEnd);
   }
 }
 
 void drawClock(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   
-  String displayTime = timeClient.getAmPmHours() + ":" + timeClient.getMinutes() + ":" + timeClient.getSeconds();
-  if (IS_24HOUR) {
-    displayTime = timeClient.getHours() + ":" + timeClient.getMinutes() + ":" + timeClient.getSeconds(); 
-  }
+  String displayTime = timeHandler.getDisplayTime(now(), IS_24HOUR, true);
+
   String displayName = PrinterHostName;
   if (printerClient.getPrinterType() == "Repetier") {
     displayName = printerClient.getPrinterName();
@@ -1092,7 +1095,7 @@ void drawUpdate(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 String getTimeTillUpdate() {
   String rtnValue = "";
 
-  long timeToUpdate = (((minutesBetweenDataRefresh * 60) + lastEpoch) - timeClient.getCurrentEpoch());
+  long timeToUpdate = (((minutesBetweenDataRefresh * 60) + lastEpoch) - now());
 
   int hours = numberOfHours(timeToUpdate);
   int minutes = numberOfMinutes(timeToUpdate);
@@ -1147,17 +1150,15 @@ String zeroPad(int value) {
 void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
   display->setColor(WHITE);
   display->setFont(ArialMT_Plain_16);
-  String displayTime = timeClient.getAmPmHours() + ":" + timeClient.getMinutes();
-  if (IS_24HOUR) {
-    displayTime = timeClient.getHours() + ":" + timeClient.getMinutes();
-  }
+  
+  String displayTime = timeHandler.getDisplayTime(now(), IS_24HOUR, false);
+
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->drawString(0, 48, displayTime);
   
   if (!IS_24HOUR) {
-    String ampm = timeClient.getAmPm();
     display->setFont(ArialMT_Plain_10);
-    display->drawString(39, 54, ampm);
+    display->drawString(39, 54, timeHandler.getAMPM(now()));
   }
 
   display->setFont(ArialMT_Plain_16);
@@ -1181,7 +1182,7 @@ void drawClockHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
   display->setFont(ArialMT_Plain_16);
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   if (!IS_24HOUR) {
-    display->drawString(0, 48, timeClient.getAmPm());
+    display->drawString(0, 48, timeHandler.getAMPM(now()));
     display->setTextAlignment(TEXT_ALIGN_CENTER);
     if (printerClient.isPSUoff()) {
       display->drawString(64, 47, "psu off");
@@ -1264,7 +1265,7 @@ void writeSettings() {
   }
   f.close();
   readSettings();
-  timeClient.setUtcOffset(UtcOffset);
+  timeHandler.setUtcOffset(UtcOffset);
 }
 
 void readSettings() {
@@ -1392,16 +1393,16 @@ void readSettings() {
   weatherClient.updateLanguage(WeatherLanguage);
   weatherClient.setMetric(IS_METRIC);
   weatherClient.updateCityIdList(CityIDs, 1);
-  timeClient.setUtcOffset(UtcOffset);
+  timeHandler.setUtcOffset(UtcOffset);
 }
 
 int getMinutesFromLastRefresh() {
-  int minutes = (timeClient.getCurrentEpoch() - lastEpoch) / 60;
+  int minutes = (now() - lastEpoch) / 60;
   return minutes;
 }
 
 int getMinutesFromLastDisplay() {
-  int minutes = (timeClient.getCurrentEpoch() - displayOffEpoch) / 60;
+  int minutes = (now() - displayOffEpoch) / 60;
   return minutes;
 }
 
@@ -1472,10 +1473,10 @@ void enableDisplay(boolean enable) {
       displayOffEpoch = 0;  // reset
     }
     display.displayOn();
-    Serial.println("Display was turned ON: " + timeClient.getFormattedTime());
+    Serial.println("Display was turned ON: " + timeHandler.getDisplayTime(now(), false, true) + " " + timeHandler.getAMPM(now()));
   } else {
     display.displayOff();
-    Serial.println("Display was turned OFF: " + timeClient.getFormattedTime());
+    Serial.println("Display was turned OFF: " + timeHandler.getDisplayTime(now(), false, true) + " " + timeHandler.getAMPM(now()));
     displayOffEpoch = lastEpoch;
   }
 }

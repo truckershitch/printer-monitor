@@ -59,6 +59,27 @@ boolean MoonrakerClient::validate() {
   return rtnValue;
 }
 
+float MoonrakerClient::avgCheck(float check, float val1, float val2) {
+  
+  float outlierFactor = 2.75;
+  float sum = 0.0;
+  int count = 0;
+  
+  if(val1 > 0) {
+    sum += val1;
+    count++;
+  }
+  else {
+    sum += val2;
+  }
+  if(val2 > 0) {
+    sum += val2;
+    count++;
+  }
+
+  return sum / count * outlierFactor;
+}
+
 WiFiClient MoonrakerClient::getRequest(String apiData, String apiPostBody="") {
   WiFiClient printClient;
   printClient.setTimeout(5000);
@@ -155,7 +176,7 @@ String MoonrakerClient::urlEncode(String url) {
   return encoded;
 }
 
-void MoonrakerClient::getPrinterJobResults(float utcOffset) {
+void MoonrakerClient::getPrinterJobResults() {
   if (!validate()) {
     return;
   }
@@ -329,9 +350,9 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
       progressCompletion = (float)(filePos - gcStart) / gcSize;
       printerData.progressCompletion = String((int)(progressCompletion * 100 + 0.5));
 
+      etaSlicer = (float)(estimatedTime - progressPrintTime);
       etaFile = totalDuration / progressCompletion - totalDuration;
       etaFilament = totalDuration / filamentLength * (filamentTotal - filamentLength);
-      etaSlicer = (float)(estimatedTime - progressPrintTime);
     }
     else {
       printerData.progressCompletion = String(0.0);
@@ -340,16 +361,17 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     long progressPrintTimeLeft = 0;
     float etaTime = 0.0;
     long timeCount = 0;
-    if (etaFile > 0) {
+
+    if (etaSlicer > 0 && etaSlicer <= avgCheck(etaSlicer, etaFile, etaFilament)) {
+      etaTime += etaSlicer;
+      timeCount++;
+    }
+    if (etaFile > 0 && etaFile <= avgCheck(etaFile, etaSlicer, etaFilament)) {
       etaTime += etaFile;
       timeCount++;
     }
-    if (etaFilament > 0) {
+    if (etaFilament > 0 && etaFilament <= avgCheck(etaFilament, etaSlicer, etaFile)) {
       etaTime += etaFilament;
-      timeCount++;
-    }
-    if (etaSlicer > 0) {
-      etaTime += etaSlicer;
       timeCount++;
     }
     if (etaTime > 0 && timeCount > 0) {
@@ -364,40 +386,32 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     Serial.println("totalDuration: " + String(totalDuration));
     Serial.println("filamentLength: " + String(filamentLength));
     Serial.println("filamentTotal: " + String(filamentTotal));
-    Serial.println("etaFile: " + String(etaFile));
-    Serial.println("etaFilament: " + String(etaFilament));
-    Serial.println("etaSlicer: " + String(etaSlicer));
+    Serial.println("etaFile: " + String(etaFile) + " avgCheck: " + String(avgCheck(etaFile, etaSlicer, etaFilament)));
+    Serial.println("etaFilament: " + String(etaFilament) + " avgCheck: " + String(avgCheck(etaFilament, etaSlicer, etaFile)));
+    Serial.println("etaSlicer: " + String(etaSlicer) + " avgCheck: " + String(avgCheck(etaSlicer, etaFile, etaFilament)));
     Serial.println("progressCompletion : " + String(progressCompletion));
 
     printerData.progressPrintTimeLeft = String(progressPrintTimeLeft);
 
     if (progressPrintTime > 0) {
-      long eta = (long)(piEpoch + utcOffset * 3600 + progressPrintTimeLeft + 0.5);
+      long eta = (long)(now() + progressPrintTimeLeft + 0.5);
       char buff[32];
-      int etaHour = hourFormat12(eta); // 12 hour format
+      // now sending in 24 hour format
 
       if (progressPrintTimeLeft >= 86400) {
-        sprintf(buff, "%02d.%02d.%02d %02d:%02d ", month(eta), day(eta), year(eta) % 100, etaHour, minute(eta));
+        sprintf(buff, "%s %02d:%02d", dayShortStr(weekday((eta))), hour(eta), minute(eta));
       }
       else {
-        sprintf(buff, "%02d:%02d ", etaHour, minute(eta));
+        sprintf(buff, "%02d:%02d", hour(eta), minute(eta));
       }
 
       Serial.println("progressPrintTimeLeft: " + String(progressPrintTimeLeft));
       Serial.println("piEpoch: " + String(piEpoch));
-      Serial.println("utcOffset: "  + String(utcOffset));
       Serial.println("eta timestamp: " + String(eta));
       Serial.println("friendly eta: " + String(buff));
       Serial.println("totalDuration: " + String(totalDuration));
 
       printerData.estimatedEndTime = buff;
-      if (isAM(eta)) {
-        printerData.estimatedEndTime += "AM";
-      }
-      else {
-        printerData.estimatedEndTime += "PM";
-      }
-
       Serial.println("ETA: " + printerData.estimatedEndTime);
     }
     else {
@@ -409,7 +423,7 @@ void MoonrakerClient::getPrinterJobResults(float utcOffset) {
     float flh = metaDataRoot["result"]["first_layer_height"].as<float>();
     float lh = metaDataRoot["result"]["layer_height"].as<float>();
 
-    int totalLayers = (int)ceil(((h - flh) / lh) + 1);
+    int totalLayers = (int)ceil(((h - flh) / lh));
     int currentLayer = (int)ceil((gcode_z_pos - flh) / lh + 1);
     printerData.totalLayers = String(totalLayers);
     if (progressPrintTime > 0 && filePos > gcStart) {
