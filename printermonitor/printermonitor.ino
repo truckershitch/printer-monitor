@@ -1024,19 +1024,24 @@ void drawScreen5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int
   if (!IS_24HOUR && EstimatedEnd != "Unknown") {
     int etaHour24;
     int etaHour24Pos = estEndLen - 5;
-    String etaHour12;
-    String suffix = " AM";
+    String etaHour12, suffix;
 
     etaHour24 = EstimatedEnd.substring(etaHour24Pos, 2).toInt();
     if (etaHour24 > 12) {
       etaHour12 = String(etaHour24 - 12);
-      suffix = String(" PM");
+      suffix = " PM";
     }
     else if (etaHour24 == 0) {
-      etaHour12 = String("12");
+      etaHour12 = "12";
+      suffix = " AM";
+    }
+    else if (etaHour24 == 12) {
+      etaHour12 = "12";
+      suffix = " PM";
     }
     else {
       etaHour12 = String(etaHour24);
+      suffix = " AM";
     }
 
     EstimatedEnd = etaHour12 + EstimatedEnd.substring(etaHour24Pos + 2) + suffix;
