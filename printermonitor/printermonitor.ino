@@ -91,7 +91,7 @@ boolean displayOn = true;
 #if defined(USE_REPETIER_CLIENT)
   RepetierClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
 #elif defined(USE_MOONRAKER_CLIENT)
-  MoonrakerClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
+  MoonrakerClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU, ETAMethod);
 #else
   OctoPrintClient printerClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
 #endif
@@ -127,6 +127,7 @@ static const char CLOCK_FORM[] PROGMEM = "<hr><p><input name='isClockEnabled' cl
 static const char THEME_FORM[] PROGMEM =   "<p>Theme Color <select class='w3-option w3-padding' name='theme'>%THEME_OPTIONS%</select></p>"
                       "<p><label>UTC Time Offset</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='utcoffset' value='%UTCOFFSET%' maxlength='12'></p><hr>"
                       "<p><label>NTP Server</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='ntpserver' value='%NTPSERVER%'></p><hr>"
+                      "<p>ETA Calculation Method <select class='w3-option w3-padding' name='etaoptions'>%ETAOPTIONS%</select></p>"
                       "<p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
                       "<p><label>User ID (for this interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
                       "<p><label>Password </label><input class='w3-input w3-border w3-margin-bottom' type='password' name='stationpassword' value='%STATIONPASSWORD%'></p>"
@@ -495,6 +496,8 @@ void handleUpdateConfig() {
   minutesBetweenDataRefresh = server.arg("refresh").toInt();
   themeColor = server.arg("theme");
   UtcOffset = server.arg("utcoffset").toFloat();
+  NtpServer = server.arg("ntpserver");
+  ETAMethod = server.arg("etamethod");
   String temp = server.arg("userid");
   temp.toCharArray(www_username, sizeof(temp));
   temp = server.arg("stationpassword");
@@ -686,6 +689,10 @@ void handleConfigure() {
   form.replace("%USERID%", String(www_username));
   form.replace("%STATIONPASSWORD%", String(www_password));
 
+  String etaoptions = "<option>Auto</option><option>Slicer</option><option>File</option><option>Filament</option>";
+  etaoptions.replace(">"+ETAMethod+"<", " selected>"+ETAMethod+"<");
+  form.replace("%ETAOPTIONS%", etaoptions);
+  
   server.sendContent(form);
   
   html = getFooter();
@@ -1021,7 +1028,7 @@ void drawScreen5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int
 
   display->drawString(64 + x, 0 + y, "End Time");
 
-  if (!IS_24HOUR && EstimatedEnd != "Unknown") {
+  if (!IS_24HOUR && EstimatedEnd != "Unknown" && estEndLen <= 7) { // 12 hour time and known
     int etaHour24;
     int etaHour24Pos = estEndLen - 5;
     String etaHour12, suffix;
@@ -1048,13 +1055,13 @@ void drawScreen5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int
   }
 
   //display->setTextAlignment(TEXT_ALIGN_LEFT);
-  if (estEndLen <= 8) { // no date included 
+  if (estEndLen <= 7) { // no date included 
     display->setFont(ArialMT_Plain_24);
     display->drawString(64 + x, 14 + y, EstimatedEnd);
   }
   else {
     display->setFont(ArialMT_Plain_16);
-    display->drawString(48 + x, 18 + y, EstimatedEnd);
+    display->drawString(32 + x, 18 + y, EstimatedEnd);
   }
 }
 
@@ -1393,7 +1400,7 @@ void readSettings() {
   }
   fr.close();
 
-  printerClient.updatePrintClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU);
+  printerClient.updatePrintClient(PrinterApiKey, PrinterServer, PrinterPort, PrinterAuthUser, PrinterAuthPass, HAS_PSU, ETAMethod);
   weatherClient.updateWeatherApiKey(WeatherApiKey);
   weatherClient.updateLanguage(WeatherLanguage);
   weatherClient.setMetric(IS_METRIC);

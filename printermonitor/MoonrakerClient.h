@@ -38,6 +38,7 @@ private:
   String myApiKey = "";
   String encodedAuth = "";
   boolean pollPsu;
+  String myETAMethod = "";
   const String printerType = "Moonraker";
 
   void resetPrintData();
@@ -77,10 +78,10 @@ private:
   PrinterStruct printerData;
 
 public:
-  MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
+  MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu, String eta_method);
   void getPrinterJobResults();
   void getPrinterPsuState();
-  void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu);
+  void updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu, String eta_method);
 
   String getAveragePrintTime();
   String getEstimatedPrintTime();

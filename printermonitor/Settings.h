@@ -62,11 +62,11 @@ SOFTWARE.
 
 // OctoPrint / Repetier / Moonraker Monitoring -- Monitor your 3D OctoPrint / Repetier / Moonraker Server
 //#define USE_REPETIER_CLIENT       // Uncomment this line to use the Repetier Printer Server -- OctoPrint is used by default and is most common
-//#define USE_MOONRAKER_CLIENT       // Uncomment this line to use the Moonraker Printer Server -- OctoPrint is used by default and is most common
+#define USE_MOONRAKER_CLIENT       // Uncomment this line to use the Moonraker Printer Server -- OctoPrint is used by default and is most common
 String PrinterApiKey = "";   // ApiKey from your User Account on OctoPrint / Repetier / Moonraker
-String PrinterHostName = "octopi";// Default 'octopi' -- or hostname if different (optional if your IP changes)
+String PrinterHostName = "moonraker";// Default 'octopi' -- or hostname if different (optional if your IP changes)
 String PrinterServer = "";   // IP or Address of your OctoPrint / Repetier / Moonraker Server (DO NOT include http://)
-int PrinterPort = 80;        // the port you are running your OctoPrint / Repetier / Moonraker server on (usually 80 -- 7125 for Moonraker);
+int PrinterPort = 7125;        // the port you are running your OctoPrint / Repetier / Moonraker server on (usually 80 -- 7125 for Moonraker);
 String PrinterAuthUser = "";      // only used if you have haproxy or basic authentication turned on (not default)
 String PrinterAuthPass = "";      // only used with haproxy or basic auth (only needed if you must authenticate)
 
@@ -93,6 +93,7 @@ String NtpServer = "pool.ntp.org"; // NTP Server to synchronize time
 boolean IS_24HOUR = false;     // 23:00 millitary 24 hour clock
 int minutesBetweenDataRefresh = 15;
 boolean DISPLAYCLOCK = true;   // true = Show Clock when not printing / false = turn off display when not printing
+String ETAMethod = "Auto"; // ETA Calculation Method, currently only for Moonraker -- Auto, Slicer, Filament, File
 
 // Display Settings
 const int I2C_DISPLAY_ADDRESS = 0x3c; // I2C Address of your Display (usually 0x3c or 0x3d)

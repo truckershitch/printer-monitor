@@ -26,11 +26,11 @@ SOFTWARE.
 
 #include "MoonrakerClient.h"
 
-MoonrakerClient::MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu) {
-  updatePrintClient(ApiKey, server, port, user, pass, psu);
+MoonrakerClient::MoonrakerClient(String ApiKey, String server, int port, String user, String pass, boolean psu, String eta_method) {
+  updatePrintClient(ApiKey, server, port, user, pass, psu, eta_method);
 }
 
-void MoonrakerClient::updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu) {
+void MoonrakerClient::updatePrintClient(String ApiKey, String server, int port, String user, String pass, boolean psu, String eta_method) {
   server.toCharArray(myServer, 100);
   myApiKey = ApiKey;
   myPort = port;
@@ -41,6 +41,7 @@ void MoonrakerClient::updatePrintClient(String ApiKey, String server, int port, 
     encodedAuth = b64.encode(userpass, true);
   }
   pollPsu = psu;
+  myETAMethod = eta_method;
 }
 
 boolean MoonrakerClient::validate() {
@@ -343,6 +344,7 @@ void MoonrakerClient::getPrinterJobResults() {
     // Parse JSON object
     double piEpoch = metaDataRoot2["result"]["moonraker_stats"][0]["time"];    
 
+    // ETA Calculation
     float etaFile = 0.0;
     float etaFilament = 0.0;
     float etaSlicer = 0.0;
@@ -362,15 +364,15 @@ void MoonrakerClient::getPrinterJobResults() {
     float etaTime = 0.0;
     long timeCount = 0;
 
-    if (etaSlicer > 0 && etaSlicer <= avgCheck(etaSlicer, etaFile, etaFilament)) {
+    if ((myETAMethod == "Auto" || myETAMethod == "Slicer") && etaSlicer > 0 && etaSlicer <= avgCheck(etaSlicer, etaFile, etaFilament)) {
       etaTime += etaSlicer;
       timeCount++;
     }
-    if (etaFile > 0 && etaFile <= avgCheck(etaFile, etaSlicer, etaFilament)) {
+    if ((myETAMethod == "Auto" || myETAMethod == "File") && etaFile > 0 && etaFile <= avgCheck(etaFile, etaSlicer, etaFilament)) {
       etaTime += etaFile;
       timeCount++;
     }
-    if (etaFilament > 0 && etaFilament <= avgCheck(etaFilament, etaSlicer, etaFile)) {
+    if ((myETAMethod == "Auto" || myETAMethod == "Filament") && etaFilament > 0 && etaFilament <= avgCheck(etaFilament, etaSlicer, etaFile)) {
       etaTime += etaFilament;
       timeCount++;
     }
